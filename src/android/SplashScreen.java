@@ -27,7 +27,10 @@ import android.content.res.Configuration;
 import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.Handler;
+import android.support.annotation.Nullable;
+import android.util.Log;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.View;
@@ -47,6 +50,9 @@ import org.apache.cordova.CordovaWebView;
 import org.json.JSONArray;
 import org.json.JSONException;
 
+import pl.droidsonroids.gif.GifDrawable;
+import pl.droidsonroids.gif.GifImageView;
+
 public class SplashScreen extends CordovaPlugin {
     private static final String LOG_TAG = "SplashScreen";
     // Cordova 3.x.x has a copy of this plugin bundled with it (SplashScreenInternal.java).
@@ -62,7 +68,9 @@ public class SplashScreen extends CordovaPlugin {
     /**
      * Displays the splash drawable.
      */
-    private ImageView splashImageView;
+//    private ImageView splashImageView;
+    private GifImageView splashImageView;
+    private GifDrawable gifDrawable = null;
 
     /**
      * Remember last device orientation to detect orientation changes.
@@ -140,18 +148,26 @@ public class SplashScreen extends CordovaPlugin {
 
     @Override
     public void onPause(boolean multitasking) {
+        Log.e("splash", "[onPause] 111");
         if (HAS_BUILT_IN_SPLASH_SCREEN) {
             return;
         }
-        // hide the splash screen to avoid leaking a window
-        this.removeSplashScreen(true);
+        Log.e("splash", "[onPause] 222");
+
+        final Handler handler = new Handler();
+        handler.postDelayed(() -> {
+            // hide the splash screen to avoid leaking a window
+            this.removeSplashScreen(true);
+        }, 10000);
     }
 
     @Override
     public void onDestroy() {
+        Log.e("splash", "[onDestroy] 111");
         if (HAS_BUILT_IN_SPLASH_SCREEN) {
             return;
         }
+        Log.e("splash", "[onDestroy] 222");
         // hide the splash screen to avoid leaking a window
         this.removeSplashScreen(true);
         // If we set this to true onDestroy, we lose track when we go from page to page!
@@ -211,6 +227,9 @@ public class SplashScreen extends CordovaPlugin {
             if (splashImageView != null) {
                 int drawableId = getSplashId();
                 if (drawableId != 0) {
+                    Log.e("splash", "[onConfigurationChanged] 111");
+//                    Context context = webView.getContext();
+//                    Glide.with(context).asGif().load(drawableId).into(splashImageView);
                     splashImageView.setImageDrawable(cordova.getActivity().getResources().getDrawable(drawableId));
                 }
             }
@@ -218,6 +237,8 @@ public class SplashScreen extends CordovaPlugin {
     }
 
     private void removeSplashScreen(final boolean forceHideImmediately) {
+        Log.e("splash", "[removeSplashScreen] 112221");
+
         cordova.getActivity().runOnUiThread(new Runnable() {
             public void run() {
         if (splashDialog != null && splashImageView != null && splashDialog.isShowing()) {//check for non-null splashImageView, see https://issues.apache.org/jira/browse/CB-12277
@@ -274,6 +295,8 @@ public class SplashScreen extends CordovaPlugin {
 
         lastHideAfterDelay = hideAfterDelay;
 
+        Log.e("splash", "[showSplashScreen] lastHideAfterDelay=" + lastHideAfterDelay + "  effectiveSplashDuration=" + effectiveSplashDuration);
+
         // Prevent to show the splash dialog if the activity is in the process of finishing
         if (cordova.getActivity().isFinishing()) {
             return;
@@ -293,8 +316,17 @@ public class SplashScreen extends CordovaPlugin {
                 Context context = webView.getContext();
 
                 // Use an ImageView to render the image because of its flexible scaling options.
-                splashImageView = new ImageView(context);
-                splashImageView.setImageResource(drawableId);
+                splashImageView = new GifImageView(context);
+                try {
+                    gifDrawable =new GifDrawable(context.getResources(),drawableId);
+                } catch (Exception e) {
+                    Log.e("splash", "[showSplashScreen] gifDrawable exception:" + e.getMessage());
+                    e.printStackTrace();
+                }
+                Log.e("splash", "[showSplashScreen] GifImageView gifDrawable start....");
+                splashImageView.setImageDrawable(gifDrawable);
+                gifDrawable.start();
+//                splashImageView.setImageResource(drawableId);
                 LayoutParams layoutParams = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
                 splashImageView.setLayoutParams(layoutParams);
 
@@ -305,10 +337,12 @@ public class SplashScreen extends CordovaPlugin {
                 splashImageView.setBackgroundColor(preferences.getInteger("backgroundColor", Color.BLACK));
 
                 if (isMaintainAspectRatio()) {
+                    Log.e("splash", "[showSplashScreen] CENTER_CROP");
                     // CENTER_CROP scale mode is equivalent to CSS "background-size:cover"
                     splashImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 }
                 else {
+                    Log.e("splash", "[showSplashScreen] FIT_XY");
                     // FIT_XY scales image non-uniformly to fit into image view.
                     splashImageView.setScaleType(ImageView.ScaleType.FIT_XY);
                 }
@@ -335,6 +369,7 @@ public class SplashScreen extends CordovaPlugin {
                     handler.postDelayed(new Runnable() {
                         public void run() {
                             if (lastHideAfterDelay) {
+                                Log.e("splash", "[showSplashScreen] postDelayed removeSplashScreen");
                                 removeSplashScreen(false);
                             }
                         }
